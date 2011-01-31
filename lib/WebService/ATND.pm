@@ -38,12 +38,31 @@ sub fetch {
     }
     my $rtn = XMLin( $self->response->content, ForceArray => qr/^event$/, ContentKey => "value" );
     $rtn = Data::Recursive::Encode->encode( $self->encoding, $rtn ) if $self->encoding;
+    my $store_method = "_store_$path";
+    $store_method =~ s/\//_/g;
+    $self->$store_method( $rtn );
+}
+
+sub _store_events {
+    my ( $self, $rtn ) = @_;
     $self->events( [] );
     for my $event ( @{ $rtn->{ events }->{ event } } ) {
         push @{ $self->events }, _gen_event( $event );
     }
     $self->events( [ sort { $a->start->epoch <=> $b->start->epoch } @{ $self->events } ] );
     $self->iter(0);
+}
+
+sub _store_events_users {
+    my ( $self, $rtn ) = @_;
+    $self->_store_events( $rtn );
+    for my $event ( @{ $self->events } ) {
+        for my $user ( @{ $event->users->user } ) {
+            $user = _gen_user( $user );
+        }
+        $event->users( $event->users->user );
+        $event->accepted( $event->accepted->value );
+    }
 }
 
 sub next {
@@ -83,27 +102,29 @@ sub _rq {
 
 sub _gen_event {
     my $event = shift;
-
     $event->{ id } = sprintf( '%d', $event->{ event_id }->{ value } );
     delete $event->{ event_id };
-
-    $event->{ lat } = sprintf( '%f', $event->{ lat }->{ value } );
-
-    $event->{ lon } = sprintf( '%f', $event->{ lon }->{ value } );
-
+    $event->{ lat } = sprintf( '%f', $event->{ lat }->{ value } ) if $event->{ lat };
+    $event->{ lon } = sprintf( '%f', $event->{ lon }->{ value } ) if $event->{ lon };
     $event->{ waiting } = sprintf( '%d', $event->{ waiting }->{ value } );
-
     $event->{ start } = DateTime::Format::ISO8601->parse_datetime( $event->{ started_at }->{ value } ) if $event->{ started_at }->{ value };
     delete $event->{ started_at };
-
     $event->{ end } = DateTime::Format::ISO8601->parse_datetime( $event->{ ended_at }->{ value } ) if $event->{ ended_at }->{ value };
     delete $event->{ ended_at };
-
+    $event->{ update } = DateTime::Format::ISO8601->parse_datetime( $event->{ updated_at }->{ value } ) if $event->{ updated_at }->{ value };
+    delete $event->{ updated_at };
     $event->{ url } = $event->{ url }->{ value };    
-
     $event->{ limit } = sprintf( '%d', $event->{ limit }->{ value } );
-
     Hash::AsObject->new( $event );
+}
+
+sub _gen_user {
+    my $user = shift;
+    $user->{ status } = $user->{ status }->{ value } if $user->{ status }->{ value };
+    $user->{ id } = $user->{ user_id }->{ value } if $user->{ user_id }->{ value };
+    delete $user->{ user_id };
+    $user->{ twitter_id } = undef if ref $user->{ twitter_id } eq 'HASH';
+    Hash::AsObject->new( $user );
 }
 
 1;
@@ -111,21 +132,79 @@ __END__
 
 =head1 NAME
 
-WebService::ATND - 
+WebService::ATND - ATND API Wrapper Class
 
 =head1 SYNOPSIS
 
   use WebService::ATND;
 
-=head1 DESCRIPTION
+  my $atnd = WebService::ATND->new;
+  ### or ###
+  my $atnd = WebService::ATND->new( encoding => 'utf8' ); 
+  
+  ### Fetch event infomation
+  $atnd->fetch( 'event', keyword => 'perl' );
+  
+  ### Print each event name
+  print $_->title."\n" while $atnd->next;
+  
+  ### Fetch users who joins to event
+  $atnd->fetch( 'event/users', event_id => 10201 );
 
-WebService::ATND is
+  ### Print each users who joins to event
+  my $event = $atnd->next;
+  $_->nickname."\n" for @{ $event->users };
+
+=head1 NOTE!!!!
+
+THIS IS ALPHA QUALITY CODE!
+
+If you found bug, please report by e-mail or twitter(@ytnobody).
+
+This module inherits LWP::UserAgent.
+
+=head1 INSTALL
+
+  $ git clone git://github.com/ytnobody/WebService-ATND.git
+  $ cpanm ./WebService-ATND
+
+=head1 METHODS
+
+=head2 new( %params ) 
+
+Create an instance of WebService::ATND.
+
+%params are options of LWP::UserAgent. And, following are appended. 
+
+- encoding : Specifier of output-data encoding ( eg. utf8, shiftjis ... )
+
+These option is not required.
+
+=head2 fetch( $api_path, %params )
+
+Send a http-request to ATND-API. Instance stores events-data that contained into response.
+
+$api_path is a path for API. Currently, it becomes to 'events' or 'event/users'.
+
+%params is query parameters for extracting data from API.
+
+=head2 next / prev
+
+Get stored data from instance;
+
+=head2 iter
+
+=head2 events
 
 =head1 AUTHOR
 
 ytnobody E<lt>ytnobody@gmail.comE<gt>
 
 =head1 SEE ALSO
+
+Hash::ToObject
+
+http://api.atnd.org/
 
 =head1 LICENSE
 

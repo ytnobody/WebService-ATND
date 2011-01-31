@@ -48,8 +48,6 @@ my $event;
     is $atnd->iter, 1;
 }
 
-done_testing();
-
 {
     $atnd->fetch( 'events', keyword => 'perl' );
     @events = $atnd->today_start;
@@ -58,5 +56,21 @@ done_testing();
     }
 }
 
+{
+    $atnd->fetch( 'events/users', event_id => 9807 );
+    $event = $atnd->next;
+    is $event->users->[0]->nickname, "uzulla";
+    is $event->users->[1]->nickname, "hide_o_55";
+    is $event->users->[2]->nickname, "norry_gogo";
+    is $event->users->[3]->nickname, "charsbar";
+    is $event->users->[4]->nickname, "ytnobody";
+    is $event->users->[5]->nickname, "umeyuki";
+    is $event->users->[6]->nickname, "hondallica666";
+    is $event->users->[7]->nickname, "makamaka_at_donzoko";
+    is $event->users->[8]->nickname, "ono_pm";
+    is $event->users->[9]->nickname, "usayman";
+    is $event->users->[10]->nickname, "studio-m";
+}
 
+done_testing();
 

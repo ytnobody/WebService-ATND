@@ -1,0 +1,83 @@
+
+=head1 NAME
+
+WebService::ATND - ATND API Wrapper Class
+
+=head1 SYNOPSIS
+
+  use WebService::ATND;
+
+  my $atnd = WebService::ATND->new;
+  ### or ###
+  my $atnd = WebService::ATND->new( encoding => 'utf8' ); 
+  
+  ### Fetch event infomation
+  $atnd->fetch( 'event', keyword => 'perl' );
+  
+  ### Print each event name
+  print $_->title."\n" while $atnd->next;
+  
+  ### Fetch users who joins to event
+  $atnd->fetch( 'event/users', event_id => 10201 );
+
+  ### Print each users who joins to event
+  my $event = $atnd->next;
+  $_->nickname."\n" for @{ $event->users };
+
+=head1 NOTE!!!!
+
+THIS IS ALPHA QUALITY CODE!
+
+If you found bug, please report by e-mail or twitter(@ytnobody).
+
+This module inherits LWP::UserAgent.
+
+=head1 INSTALL
+
+  $ git clone git://github.com/ytnobody/WebService-ATND.git
+  $ cpanm ./WebService-ATND
+
+=head1 METHODS
+
+=head2 new( %params ) 
+
+Create an instance of WebService::ATND.
+
+%params are options of LWP::UserAgent. And, following are appended. 
+
+- encoding : Specifier of output-data encoding ( eg. utf8, shiftjis ... )
+
+These option is not required.
+
+=head2 fetch( $api_path, %params )
+
+Send a http-request to ATND-API. Instance stores events-data that contained into response.
+
+$api_path is a path for API. Currently, it becomes to 'events' or 'event/users'.
+
+%params is query parameters for extracting data from API.
+
+=head2 next / prev
+
+Get stored data from instance;
+
+=head2 iter
+
+=head2 events
+
+=head1 AUTHOR
+
+ytnobody E<lt>ytnobody@gmail.comE<gt>
+
+=head1 SEE ALSO
+
+Hash::ToObject
+
+http://api.atnd.org/
+
+=head1 LICENSE
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
