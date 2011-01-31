@@ -8,6 +8,7 @@ requires 'SUPER';
 requires 'URI';
 requires 'Data::Recursive::Encode';
 requires 'Hash::AsObject';
+requires 'DateTime::Format::ISO8601';
 
 tests 't/*.t';
 author_tests 'xt';
