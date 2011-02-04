@@ -1,7 +1,6 @@
 use Test::More;
 use WebService::ATND;
 use POSIX qw/ strftime /;
-use Data::Dumper;
 
 my $atnd = WebService::ATND->new( encoding => "utf8" );
 my $event;
