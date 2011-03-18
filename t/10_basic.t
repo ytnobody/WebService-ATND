@@ -64,7 +64,7 @@ my $event;
     is $event->users->[3]->nickname, "charsbar";
     is $event->users->[4]->nickname, "ytnobody";
     is $event->users->[5]->nickname, "umeyuki";
-    is $event->users->[6]->nickname, "hondallica666";
+    is $event->users->[6]->nickname, "hondallica";
     is $event->users->[7]->nickname, "makamaka_at_donzoko";
     is $event->users->[8]->nickname, "ono_pm";
     is $event->users->[9]->nickname, "usayman";
