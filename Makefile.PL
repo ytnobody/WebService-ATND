@@ -2,6 +2,7 @@ use inc::Module::Install;
 name 'WebService-ATND';
 all_from 'lib/WebService/ATND.pm';
 
+requires 'Class::Accessor::Fast';
 requires 'LWP::UserAgent';
 requires 'XML::Simple';
 requires 'SUPER';
