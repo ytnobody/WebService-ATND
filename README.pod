@@ -71,7 +71,7 @@ ytnobody E<lt>ytnobody@gmail.comE<gt>
 
 =head1 SEE ALSO
 
-Hash::ToObject
+Hash::AsObject
 
 http://api.atnd.org/
 
