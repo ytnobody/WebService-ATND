@@ -8,3 +8,11 @@ __DATA__
 ytnobody
 ytnobody@gmail.com
 WebService::ATND
+API
+eg
+http
+iter
+prev
+shiftjis
+utf
+

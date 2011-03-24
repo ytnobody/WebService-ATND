@@ -2,3 +2,7 @@ Revision history for Perl extension WebService::ATND
 
 0.01    Sun Jan 30 23:25:43 2011
         - original version
+
+0.01001	Thu Mar 24 14:34:50 2011
+	- added tests
+	- modified Makefile.PL

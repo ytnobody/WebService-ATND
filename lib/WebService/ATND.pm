@@ -1,5 +1,8 @@
 package WebService::ATND;
-our $VERSION = '0.01';
+use warnings;
+use strict;
+
+our $VERSION = '0.01001';
 
 use parent qw/ LWP::UserAgent Class::Accessor::Fast /;
 use XML::Simple;
@@ -9,6 +12,7 @@ use Data::Recursive::Encode;
 use Hash::AsObject;
 use DateTime::Format::ISO8601;
 use POSIX qw/ strftime /;
+use Data::Dumper;
 
 __PACKAGE__->mk_accessors( qw/ baseurl encoding events iter response / );
 
@@ -38,6 +42,7 @@ sub fetch {
     }
     my $rtn = XMLin( $self->response->content, ForceArray => qr/^event$/, ContentKey => "value" );
     $rtn = Data::Recursive::Encode->encode( $self->encoding, $rtn ) if $self->encoding;
+    $rtn = _no_nil( $rtn );
     my $store_method = "_store_$path";
     $store_method =~ s/\//_/g;
     $self->$store_method( $rtn );
@@ -104,8 +109,8 @@ sub _gen_event {
     my $event = shift;
     $event->{ id } = sprintf( '%d', $event->{ event_id }->{ value } );
     delete $event->{ event_id };
-    $event->{ lat } = sprintf( '%f', $event->{ lat }->{ value } ) if $event->{ lat };
-    $event->{ lon } = sprintf( '%f', $event->{ lon }->{ value } ) if $event->{ lon };
+    $event->{ lat } = sprintf( '%f', $event->{ lat }->{ value } ) if $event->{ lat }->{ value };
+    $event->{ lon } = sprintf( '%f', $event->{ lon }->{ value } ) if $event->{ lon }->{ value };
     $event->{ waiting } = sprintf( '%d', $event->{ waiting }->{ value } );
     $event->{ start } = DateTime::Format::ISO8601->parse_datetime( $event->{ started_at }->{ value } ) if $event->{ started_at }->{ value };
     delete $event->{ started_at };
@@ -113,8 +118,8 @@ sub _gen_event {
     delete $event->{ ended_at };
     $event->{ update } = DateTime::Format::ISO8601->parse_datetime( $event->{ updated_at }->{ value } ) if $event->{ updated_at }->{ value };
     delete $event->{ updated_at };
-    $event->{ url } = $event->{ url }->{ value };    
     $event->{ limit } = sprintf( '%d', $event->{ limit }->{ value } );
+    $event = _no_nil( $event );
     Hash::AsObject->new( $event );
 }
 
@@ -124,7 +129,15 @@ sub _gen_user {
     $user->{ id } = $user->{ user_id }->{ value } if $user->{ user_id }->{ value };
     delete $user->{ user_id };
     $user->{ twitter_id } = undef if ref $user->{ twitter_id } eq 'HASH';
+    $user = _no_nil( $user );
     Hash::AsObject->new( $user );
+}
+
+sub _no_nil {
+    no strict "refs";
+    my $hashref = shift;
+    $hashref->{ $_ } = $hashref->{ $_ }->{ nil } ? undef : $hashref->{ $_ } for keys %{ $hashref };
+    return $hashref;
 }
 
 1;
@@ -143,13 +156,13 @@ WebService::ATND - ATND API Wrapper Class
   my $atnd = WebService::ATND->new( encoding => 'utf8' ); 
   
   ### Fetch event infomation
-  $atnd->fetch( 'event', keyword => 'perl' );
+  $atnd->fetch( 'events', keyword => 'perl' );
   
   ### Print each event name
   print $_->title."\n" while $atnd->next;
   
   ### Fetch users who joins to event
-  $atnd->fetch( 'event/users', event_id => 10201 );
+  $atnd->fetch( 'events/users', event_id => 10201 );
 
   ### Print each users who joins to event
   my $event = $atnd->next;

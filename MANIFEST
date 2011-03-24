@@ -1,4 +1,5 @@
 Changes
+inc/File/Slurp.pm
 inc/Module/Install.pm
 inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm
@@ -10,14 +11,19 @@ inc/Module/Install/Metadata.pm
 inc/Module/Install/Repository.pm
 inc/Module/Install/Win32.pm
 inc/Module/Install/WriteAll.pm
+inc/Plack/Loader.pm
 inc/Test/More.pm
+inc/Test/TCP.pm
 lib/WebService/ATND.pm
 Makefile.PL
 MANIFEST			This list of files
 META.yml
 README
+README.pod
 t/00_compile.t
 t/10_basic.t
+t/11_fetch_event.t
+t/data/nocond.xml
 xt/01_podspell.t
 xt/02_perlcritic.t
 xt/03_pod.t
