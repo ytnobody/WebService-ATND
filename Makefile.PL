@@ -5,7 +5,6 @@ all_from 'lib/WebService/ATND.pm';
 requires 'parent';
 requires 'Class::Accessor::Fast';
 requires 'LWP::UserAgent';
-requires 'SUPER';
 requires 'URI';
 requires 'Data::Recursive::Encode';
 requires 'Hash::AsObject';

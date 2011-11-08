@@ -6,7 +6,6 @@ our $VERSION = '0.01001';
 
 use parent qw/ LWP::UserAgent Class::Accessor::Fast /;
 use XML::Simple;
-use SUPER;
 use URI;
 use Data::Recursive::Encode;
 use Hash::AsObject;
