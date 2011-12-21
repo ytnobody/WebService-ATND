@@ -5,7 +5,7 @@ use Plack::Loader;
 use WebService::ATND;
 use Data::Dumper;
 use FindBin;
-use strict;
+use Encode;
 
 my @pattern = (
     { id => 13928,
@@ -78,10 +78,15 @@ my $app = sub {
 my $client = sub {
     my $base = shift;
     my $atnd = WebService::ATND->new( encoding => 'utf8', baseurl => $base );
-    $atnd->fetch( 'events' );
-    while ( my $event = $atnd->next ) {
-        my $p = shift @pattern;
-        is $event->$_, $p->{ $_ }, "$_ : \n".Dumper( $event->$_ ) for keys %$p; 
+    my @res = $atnd->fetch( 'events' );
+    for my $event ( @res ) {
+        my $pat = shift @pattern;
+        for my $key ( keys %$pat ) {
+            if ( $key eq 'title' ) {
+                $event->{"$key"} = encode_utf8($event->{"$key"});
+            }
+            is $event->{ "$key" }, $pat->{ "$key" }, "$key : \n". Dumper( { expected => $pat->{ "$key" }, got => $event->{ "$key" } } );
+        }
     }
 };
 

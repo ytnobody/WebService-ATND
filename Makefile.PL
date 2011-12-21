@@ -2,18 +2,19 @@ use inc::Module::Install;
 name 'WebService-ATND';
 all_from 'lib/WebService/ATND.pm';
 
-requires 'parent';
-requires 'Class::Accessor::Fast';
-requires 'LWP::UserAgent';
+requires 'Mouse';
+requires 'MouseX::Foreign';
+requires 'Furl';
 requires 'URI';
-requires 'Data::Recursive::Encode';
-requires 'Hash::AsObject';
+requires 'Time::Piece';
 requires 'DateTime::Format::ISO8601';
 requires 'XML::Simple';
 
 tests 't/*.t';
 author_tests 'xt';
 
+test_requires 'Test::Flatten';
+test_requires 'Test::Name::FromLine';
 test_requires 'Test::More';
 test_requires 'Test::TCP';
 test_requires 'Plack::Loader';

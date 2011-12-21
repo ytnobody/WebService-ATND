@@ -2,45 +2,43 @@ package WebService::ATND;
 use warnings;
 use strict;
 
-our $VERSION = '0.01001';
+our $VERSION = '0.02001';
 
-use parent qw/ LWP::UserAgent Class::Accessor::Fast /;
+use constant TIME_FORMAT => '%Y-%m-%dT%H:%M:%S%z:00';
+
+use Mouse;
 use XML::Simple;
 use URI;
-use Data::Recursive::Encode;
-use Hash::AsObject;
+use HTTP::Request::Common;
 use DateTime::Format::ISO8601;
-use POSIX qw/ strftime /;
-use Data::Dumper;
+use Time::Piece;
+use Furl;
 
-__PACKAGE__->mk_accessors( qw/ baseurl encoding events iter response / );
+has agent => ( 
+    is => 'ro', 
+    isa => 'Furl',
+    default => sub {
+        Furl->new( 
+            agent   => join( '/', __PACKAGE__, $VERSION ), 
+            timeout => 10 
+        );
+    },
+);
 
-our $BASEURL = 'http://api.atnd.org/';
-
-sub new {
-    my $class = shift;
-    my %arg = @_;
-    my $baseurl = $arg{ baseurl };
-    my $encoding = $arg{ encoding };
-    delete $arg{ baseurl };
-    delete $arg{ encoding };
-    $arg{ agent } ||= __PACKAGE__.'/'.$VERSION;
-    $arg{ timeout } ||= 10;
-    my $self = $class->SUPER::new( %arg );
-    $self->baseurl( $baseurl ? $baseurl : $BASEURL );
-    $self->encoding( $encoding );
-    return $self;
-}
+has baseurl => ( 
+    is => 'ro', 
+    isa => 'Str', 
+    default => 'http://api.atnd.org/',
+);
 
 sub fetch {
     my ( $self, $path, %arg ) = @_;
-    my $url = $self->_rq( $path, %arg );
-    $self->response( $self->get( $url ) );
-    unless ( $self->response->is_success ) {
-        warn "Couldn't fetch response from ATND-API. Because: response-code=".$self->response->code.". API said ".$self->response->content;
+    my $url = $self->request( $path, %arg );
+    my $res = $self->agent->request(GET $url);
+    unless ( $res->is_success ) {
+        Carp::croak sprintf "Couldn't fetch response from ATND-API. Because: response-code=%s. API said %s", $res->code, $res->content;
     }
-    my $rtn = XMLin( $self->response->content, ForceArray => qr/^event$/, ContentKey => "value" );
-    $rtn = Data::Recursive::Encode->encode( $self->encoding, $rtn ) if $self->encoding;
+    my $rtn = XMLin( $res->content, ForceArray => qr/^event$/, ContentKey => "value" );
     $rtn = _no_nil( $rtn );
     my $store_method = "_store_$path";
     $store_method =~ s/\//_/g;
@@ -49,12 +47,11 @@ sub fetch {
 
 sub _store_events {
     my ( $self, $rtn ) = @_;
-    $self->events( [] );
+    my @events;
     for my $event ( @{ $rtn->{ events }->{ event } } ) {
-        push @{ $self->events }, _gen_event( $event );
+        push @events, _gen_event( $event );
     }
-    $self->events( [ sort { $a->start->epoch <=> $b->start->epoch } @{ $self->events } ] );
-    $self->iter(0);
+    return sort { $a->{ start }->epoch <=> $b->{ start }->epoch } @events;
 }
 
 sub _store_events_users {
@@ -69,35 +66,7 @@ sub _store_events_users {
     }
 }
 
-sub next {
-    my $self = shift;
-    my $res = $self->event( $self->iter );
-    $self->iter( $self->iter + 1 ) if $res;
-    return $res;
-}
-
-sub prev {
-    my $self = shift;
-    $self->iter( $self->iter - 1 );
-    my $res = $self->event( $self->iter );
-    $self->iter( 0 ) unless $self->iter >= 0;
-    return $res;
-}
-
-sub event {
-    my ( $self, $i ) = @_;
-    return unless $i >= 0 && $i <= $#{ $self->events };
-    $self->events->[$i];
-}
-
-sub today_start {
-    my $self = shift;
-    my @rtn;
-    map { push @rtn, $_ if $_->start->strftime( '%Y%m%d' ) eq strftime( '%Y%m%d', localtime() ) } @{ $self->events };
-    return @rtn;
-}
-
-sub _rq {
+sub request {
     my ( $self, $path, %arg ) = @_;
     my $uri = URI->new( $self->baseurl.$path );
     $uri->query_form( %arg );
@@ -111,15 +80,16 @@ sub _gen_event {
     $event->{ lat } = sprintf( '%f', $event->{ lat }->{ value } ) if $event->{ lat }->{ value };
     $event->{ lon } = sprintf( '%f', $event->{ lon }->{ value } ) if $event->{ lon }->{ value };
     $event->{ waiting } = sprintf( '%d', $event->{ waiting }->{ value } );
-    $event->{ start } = DateTime::Format::ISO8601->parse_datetime( $event->{ started_at }->{ value } ) if $event->{ started_at }->{ value };
-    delete $event->{ started_at };
-    $event->{ end } = DateTime::Format::ISO8601->parse_datetime( $event->{ ended_at }->{ value } ) if $event->{ ended_at }->{ value };
-    delete $event->{ ended_at };
-    $event->{ update } = DateTime::Format::ISO8601->parse_datetime( $event->{ updated_at }->{ value } ) if $event->{ updated_at }->{ value };
-    delete $event->{ updated_at };
+    for my $key ( qw( start end update ) ) {
+        my $origin_key = $key =~ /e$/ ? $key.'d_at' : $key.'ed_at';
+        if ( $event->{ $origin_key }->{ value } ) {
+            $event->{ $key } = Time::Piece->strptime( $event->{ $origin_key }->{ value }, TIME_FORMAT );
+        }
+        delete $event->{ $origin_key };
+    }
     $event->{ limit } = sprintf( '%d', $event->{ limit }->{ value } );
     $event = _no_nil( $event );
-    Hash::AsObject->new( $event );
+    return $event;
 }
 
 sub _gen_user {
@@ -129,13 +99,16 @@ sub _gen_user {
     delete $user->{ user_id };
     $user->{ twitter_id } = undef if ref $user->{ twitter_id } eq 'HASH';
     $user = _no_nil( $user );
-    Hash::AsObject->new( $user );
+    return $user;
 }
 
 sub _no_nil {
     no strict "refs";
     my $hashref = shift;
-    $hashref->{ $_ } = $hashref->{ $_ }->{ nil } ? undef : $hashref->{ $_ } for keys %{ $hashref };
+    for my $key ( keys %$hashref ) {
+        next unless ref $hashref->{ $key } eq 'HASH';
+        $hashref->{ $key } = $hashref->{ $key }->{ nil } ? undef : $hashref->{ $key };
+    }
     return $hashref;
 }
 
@@ -151,29 +124,29 @@ WebService::ATND - ATND API Wrapper Class
   use WebService::ATND;
 
   my $atnd = WebService::ATND->new;
-  ### or ###
-  my $atnd = WebService::ATND->new( encoding => 'utf8' ); 
   
   ### Fetch event infomation
-  $atnd->fetch( 'events', keyword => 'perl' );
+  my @events = $atnd->fetch( 'events', keyword => 'perl' );
   
   ### Print each event name
-  print $_->title."\n" while $atnd->next;
+  for my $event ( @events ) {
+      print $event->{title}."\n";
+  }
   
   ### Fetch users who joins to event
-  $atnd->fetch( 'events/users', event_id => 10201 );
+  my @users = $atnd->fetch( 'events/users', event_id => 10201 );
 
   ### Print each users who joins to event
-  my $event = $atnd->next;
-  $_->nickname."\n" for @{ $event->users };
+  my $event = shift @users;
+  for my $user ( @{ $event->{users} } ) {
+      $user->{nickname}."\n";
+  }
 
 =head1 NOTE!!!!
 
 THIS IS ALPHA QUALITY CODE!
 
 If you found bug, please report by e-mail or twitter(@ytnobody).
-
-This module inherits LWP::UserAgent.
 
 =head1 INSTALL
 
@@ -194,27 +167,17 @@ These option is not required.
 
 =head2 fetch( $api_path, %params )
 
-Send a http-request to ATND-API. Instance stores events-data that contained into response.
+Send a http-request to ATND-API, and returns events-data list.
 
 $api_path is a path for API. Currently, it becomes to 'events' or 'event/users'.
 
 %params is query parameters for extracting data from API.
-
-=head2 next / prev
-
-Get stored data from instance;
-
-=head2 iter
-
-=head2 events
 
 =head1 AUTHOR
 
 ytnobody E<lt>ytnobody@gmail.comE<gt>
 
 =head1 SEE ALSO
-
-Hash::AsObject
 
 http://api.atnd.org/
 
